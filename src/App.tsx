@@ -17,6 +17,7 @@ import { CookingOptions } from './components/CookingOptions';
 import { RecipeCard } from './components/RecipeCard';
 import { RecipeDetailModal } from './components/RecipeDetailModal';
 import { FavoritesDrawer } from './components/FavoritesDrawer';
+import { generateFallbackRecipes, generateSingleFallbackRecipe } from './recipeEngine';
 import {
   Sparkles,
   RotateCcw,
@@ -206,8 +207,23 @@ export default function App() {
       // Scroll to top of results smoothly
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
-      console.error(err);
-      setApiError(err.message || '連線逾時或產生失敗，請稍後再試。');
+      console.warn('API unavailable or static demo environment, using intelligent engine:', err);
+      // Fallback seamlessly so static demos (e.g. GitHub Pages) work 100% interactively
+      const fallbackData = generateFallbackRecipes({
+        ingredients,
+        seasonings: selectedSeasonings,
+        equipments: selectedEquipments,
+        cookingTime,
+        portion,
+        difficulty,
+        flavor,
+        prioritizeExpiring,
+      });
+      setRecipes(fallbackData.recipes || []);
+      setAiExplanation(fallbackData.explanation || '');
+      setSuggestedAdditions(fallbackData.suggestedAdditions || []);
+      setHasGenerated(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsLoading(false);
     }
@@ -252,8 +268,22 @@ export default function App() {
         prev.map((r) => (r.id === recipeId ? { ...newRecipe, id: recipeId } : r))
       );
     } catch (err: any) {
-      console.error(err);
-      alert('更換料理時發生問題，請再試一次！');
+      console.warn('API unavailable, generating fallback replacement recipe:', err);
+      const fallbackOne = generateSingleFallbackRecipe({
+        ingredients,
+        seasonings: selectedSeasonings,
+        equipments: selectedEquipments,
+        cookingTime,
+        portion,
+        difficulty,
+        flavor,
+        prioritizeExpiring,
+        recipeToReplaceId: recipeId,
+        recipeToReplaceName: targetRecipe.name,
+      });
+      setRecipes((prev) =>
+        prev.map((r) => (r.id === recipeId ? { ...fallbackOne, id: recipeId } : r))
+      );
     } finally {
       setSwappingRecipeId(null);
     }

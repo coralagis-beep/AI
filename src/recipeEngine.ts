@@ -268,3 +268,58 @@ export function generateFallbackRecipes(params: {
     recipes,
   };
 }
+
+export function generateSingleFallbackRecipe(params: {
+  ingredients: string[];
+  seasonings?: string[];
+  equipments: CookingEquipment[];
+  cookingTime: CookingTimeOption;
+  portion: PortionOption;
+  difficulty: DifficultyOption;
+  flavor: FlavorOption;
+  prioritizeExpiring: boolean;
+  recipeToReplaceId: string;
+  recipeToReplaceName: string;
+  existingRecipeNames?: string[];
+}): Recipe {
+  const { ingredients, equipments, portion } = params;
+  const eq = equipments[Math.floor(Math.random() * equipments.length)] || '瓦斯爐';
+  const mainIng = ingredients[Math.floor(Math.random() * ingredients.length)] || '精選食材';
+  const timestamp = Date.now();
+
+  return {
+    id: `recipe-swap-${timestamp}`,
+    name: `${eq}私房香煎${mainIng}`,
+    tagline: `替換特選：以${eq}打造濃郁香氣的家常私房料理`,
+    ratingStars: 4.9,
+    recommendReason: `精準發揮${mainIng}的天然甜味，烹調簡便`,
+    estimatedTime: '15 分鐘',
+    portions: portion,
+    equipment: eq,
+    difficulty: '簡單',
+    flavor: '家常鹹香',
+    existingIngredients: ingredients.map((ing) => ({ name: ing, amount: '適量' })),
+    supplementIngredients: [],
+    seasonings: [
+      { name: '醬油', amount: '1 大匙' },
+      { name: '蒜頭', amount: '2 瓣拍碎' },
+      { name: '白胡椒粉', amount: '少許' },
+    ],
+    equipmentSpecifics: {
+      gasStove: {
+        heatLevel: '中火熱鍋熱油，下鍋煎至金黃後轉微火',
+        heatingTime: '兩面各煎約 3～4 分鐘',
+        ingredientOrder: '熱油爆香蒜瓣，再放入食材下鍋慢煎',
+        stirOrCover: '翻面後加蓋燜煮 1 分鐘，鎖住鮮甜肉汁',
+      },
+    },
+    steps: [
+      { stepNumber: 1, title: '準備食材', instruction: '食材洗淨吸乾表面水分，切成適口大小。' },
+      { stepNumber: 2, title: '爆香入鍋', instruction: '鍋中倒入少許食用油，蒜瓣爆香後放入食材。' },
+      { stepNumber: 3, title: '慢火香煎', instruction: '以中小火煎至表面金黃微焦，翻面續煎。' },
+      { stepNumber: 4, title: '淋汁起鍋', instruction: '起鍋前鍋邊淋入一茶匙醬油熗香，立刻上菜。' },
+    ],
+    safetyReminder: '煎煮時注意油噴，可使用防油噴蓋。',
+    chefTip: '下鍋前食材表面務必吸乾水分，更容易煎出誘人金黃色澤！',
+  };
+}
