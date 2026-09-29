@@ -1,0 +1,6 @@
+{
+  "name": "日常食譜小幫手",
+  "description": "把冰箱裡的食材交給我，幫你想一道簡單的料理。智慧分析食材與現有烹調設備，產生詳細美味食譜。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
