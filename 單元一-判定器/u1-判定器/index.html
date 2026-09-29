@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>視覺判定器</title>
+<style>
+:root{--bg:#f8f7f7;--card:#fff;--ink:#16181d;--body:#4a4d55;--mute:#8a8d95;--line:#e8e6e6;--red:#d23e48;--pass:#0f7a5a;--review:#b45309;--stop:#b3202b;--navy:#1e3a5f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121317;--card:#1b1d23;--ink:#eef0f4;--body:#c4c7cf;--mute:#8a8f9a;--line:#2c2f37}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,"PingFang TC","Noto Sans TC",sans-serif}
+main{max-width:1200px;margin:auto;padding:22px 16px 48px}
+.eyebrow{color:var(--red);font-weight:800;letter-spacing:.12em;font-size:13px}
+h1{margin:.15em 0 .2em;font-size:28px}
+h2{font-size:18px;margin:0 0 8px}
+.sub{color:var(--body);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.step{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--red);color:#fff;font-weight:800;font-size:14px;margin-right:6px}
+button,.btn{font:inherit;font-weight:800;border:0;border-radius:999px;padding:9px 18px;cursor:pointer;background:var(--navy);color:#fff}
+button.ghost,.btn.ghost{background:transparent;color:var(--navy);border:2px solid var(--navy)}
+button:disabled{opacity:.4;cursor:default}
+label.btn input{display:none}
+.drop{border:2px dashed var(--line);border-radius:14px;padding:14px;text-align:center;color:var(--mute)}
+.drop.on{border-color:var(--navy);background:color-mix(in srgb,var(--card) 85%,var(--navy))}
+.bar{height:10px;border-radius:9px;background:var(--line);overflow:hidden;flex:1;min-width:160px}
+.bar i{display:block;height:100%;width:0;background:var(--navy);transition:width .3s}
+.mute{color:var(--mute);font-size:13px}
+.sliders{display:grid;grid-template-columns:auto 1fr auto;gap:8px 12px;align-items:center}
+input[type=range]{width:100%}
+.kpi{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.kpi span{border:1px solid var(--line);border-radius:999px;padding:5px 14px;background:var(--card)}
+.kpi b{font-variant-numeric:tabular-nums}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.item{background:var(--card);border:3px solid var(--line);border-radius:14px;overflow:hidden}
+.item.pass{border-color:var(--pass)}.item.review{border-color:var(--review)}.item.stop{border-color:var(--stop)}
+.item .img{position:relative;aspect-ratio:4/3;background:#000}
+.item canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.item .meta{padding:8px 10px;font-size:13px}
+.item .p{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums}
+.item .sev{font-size:12px;color:var(--body);margin-top:2px;font-variant-numeric:tabular-nums}
+.tag{font-size:12px;font-weight:800;padding:2px 9px;border-radius:999px;color:#fff;white-space:nowrap}
+.tag.pass{background:var(--pass)}.tag.review{background:var(--review)}.tag.stop{background:var(--stop)}
+.truth{font-size:12px;margin-top:4px}
+.truth.miss{color:var(--stop);font-weight:800}.truth.fa{color:var(--review);font-weight:800}
+.gem{font-size:12px;color:var(--body);border-top:1px dashed var(--line);margin-top:6px;padding-top:6px}
+.heat{display:flex;gap:6px;align-items:center}
+input[type=text],input[type=password],select{font:inherit;border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--bg);color:var(--ink)}
+footer{margin-top:18px;font-size:13px;color:var(--mute)}
+footer input{width:110px}
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">單元一 · 講義 p.255–260 · 視覺品質檢驗</div>
+  <h1>視覺判定器</h1>
+  <p class="sub">先給它看良品，讓它記住「正常長什麼樣子」；再丟待判照片，<b>跟正常差越多，不良機率越高</b>。紅色區域是它覺得不對勁的地方。
+  <b>照片不會離開你的電腦</b>，模型在瀏覽器裡跑。</p>
+
+  <div class="card">
+    <h2><span class="step">0</span>模型下載</h2>
+    <div class="row"><div class="bar"><i id="mbar"></i></div><span id="mstat" class="mute">準備下載 DINOv2（約 23 MB，第一次才需要）…</span></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">1</span>給它看良品</h2>
+    <div class="drop" id="dropGood">把 <b>良品</b> 資料夾（或照片）拖到這裡　或
+      <label class="btn ghost"><input type="file" id="fGood" webkitdirectory multiple>選資料夾</label>
+      <label class="btn ghost"><input type="file" id="fGood2" accept="image/*" multiple>選照片</label>
+    </div>
+    <div class="row" style="margin-top:10px">用幾張良品
+      <select id="nGood"><option value="20" selected>20 張（最快，約半分鐘）</option><option value="40">40 張</option><option value="60">60 張（最準，約 1 分鐘）</option></select>
+      <span class="mute">這裡的「訓練」是讓模型把良品的樣子<b>記下來</b>（抽特徵存起來），不是跑好幾小時的那種訓練。</span></div>
+    <div class="row" style="margin-top:10px"><div class="bar"><i id="gbar"></i></div><span id="gstat" class="mute">還沒放良品</span></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">2</span>丟待判照片</h2>
+    <div class="drop" id="dropTest">把 <b>待判照片</b> 拖到這裡　或
+      <label class="btn ghost"><input type="file" id="fTest" accept="image/*" multiple>選照片</label>
+      <label class="btn ghost"><input type="file" id="fTestDir" webkitdirectory multiple>選資料夾</label>
+    </div>
+    <div class="row" style="margin-top:10px"><div class="bar"><i id="tbar"></i></div><span id="tstat" class="mute">先完成第 1 步</span></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">3</span>畫兩條線：三段式（講義 p.258）</h2>
+    <p class="mute" style="margin:0 0 10px">每張照片都有一個「不良機率」，用<b>放行線</b>和<b>攔截線</b>把它切成三段：機率<b>低於放行線</b>，AI 很有信心是良品 → <b style="color:var(--pass)">自動放行</b>；機率<b>高於攔截線</b>，AI 很有信心是不良 → <b style="color:var(--stop)">自動攔下</b>；<b>落在兩線之間</b>，AI 沒把握 → <b style="color:var(--review)">轉人工複判</b>。兩條線往中間拉近，人工要看的比較少，但誤判、漏檢的風險會上升；往兩邊拉開，比較保險，但轉人工的比例會變高。拉這兩條線，就是在「省人力」和「判斷風險」之間，找一個你能接受的平衡點。</p>
+    <div class="sliders">
+      <span>放行線</span><input type="range" id="lo" min="0" max="1" step="0.01" value="0.3"><b id="loV">0.30</b>
+      <span>攔截線</span><input type="range" id="hi" min="0" max="1" step="0.01" value="0.7"><b id="hiV">0.70</b>
+    </div>
+    <div class="mute" style="margin-top:6px">低於放行線 → <b style="color:var(--pass)">放行</b>　·　兩線之間 → <b style="color:var(--review)">轉人工複判</b>　·　高於攔截線 → <b style="color:var(--stop)">攔下</b></div>
+    <div class="kpi">
+      <span>放行 <b id="nPass">0</b></span><span>轉人工 <b id="nRev">0</b></span><span>攔下 <b id="nStop">0</b></span>
+      <span><b>轉人工比例 <span id="rRev">—</span></b></span>
+      <span id="truthKpi" style="display:none">漏檢 <b id="nMiss" style="color:var(--stop)">0</b>　誤判 <b id="nFA" style="color:var(--review)">0</b></span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label class="heat"><input type="checkbox" id="showHeat" checked>顯示紅色熱區</label>
+      <label class="btn ghost"><input type="file" id="fAns" accept=".json">對答案（老師發的答案檔）</label>
+    </div>
+  </div>
+
+  <p class="mute" style="margin:4px 2px 10px">卡片上的<b>「不良機率」</b>是 0～1 的數字：越接近 <b>0</b> 代表越像良品，越接近 <b>1</b> 代表跟良品差很多、越像不良。<b style="color:var(--red)">紅色亮點</b>就是熱區，標示照片裡「跟良品長得最不一樣」的位置，亮點越紅越密集，代表那個地方越可能有瑕疵。卡片右上角的 <span class="tag pass" style="vertical-align:1px">放行</span>／<span class="tag review" style="vertical-align:1px">轉人工</span>／<span class="tag stop" style="vertical-align:1px">攔下</span> 標籤，就是拿這個不良機率去對照上面第 3 步的兩條線得出的結果。機率下面那行小字把「明不明顯」也數據化了：<b>熱區佔比</b>是超過門檻的小格佔全部 256 格的百分比（瑕疵範圍多大），<b>最強差異</b>是最誇張那一格跟良品差了幾個標準差 σ（瑕疵有多突出）——比起只寫「明顯的破損」，這兩個數字才能拿來互相比較、訂驗收標準。</p>
+  <div class="grid" id="grid"></div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>方法二：同一批照片問 Gemini（可選）</h2>
+    <p class="mute" style="margin:0 0 8px">金鑰只在這一頁的記憶體裡，<b>不會存進檔案</b>，關掉分頁就沒了。照片會送到 Google。</p>
+    <div class="row">
+      <input type="password" id="gKey" placeholder="貼上你的 ai.dev 金鑰" style="flex:1;min-width:220px">
+      <select id="gModel"><option>gemini-3.6-flash</option><option>gemini-flash-lite-latest</option><option>gemini-3.8-flash</option></select>
+      <button id="gRun" disabled>請 Gemini 判同一批</button>
+    </div>
+    <div id="gStat" class="mute" style="margin-top:6px"></div>
+  </div>
+
+  <footer>
+    判定標準版本 <input type="text" id="vStd" value="v1">　·
+    照片版本 <span id="vImg">—</span>　·
+    模型 <span>DINOv2-small（Meta，Apache-2.0，q8）</span>　·
+    判定日期 <span id="vDate"></span>
+    <div style="margin-top:6px">講義 p.262：「這批當時用哪一版標準判的」要能十分鐘內回答 —— 所以這四樣寫在頁底。</div>
+  </footer>
+</main>
+
+<script type="module">
+import { AutoModel, Tensor, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0';
+env.allowLocalModels = false;
+
+// 模型從哪裡下載：先試老師的鏡像（70 人同時下載比較快），不通再退回 Hugging Face。
+const MODEL_MIRROR = 'https://works-lagis-c1-2026.mileschen.dev/hf/';
+const MODEL_ID = 'Xenova/dinov2-small';
+
+const $ = s => document.querySelector(s);
+const Q = new URLSearchParams(location.search);
+const S = 224, P = 14, G = S / P;   // 224×224 → 16×16 = 256 小格（這個模型檔只吃 224，換別的尺寸會直接報錯）
+const MEAN = [0.485, 0.456, 0.406], STD = [0.229, 0.224, 0.225];
+const BANK_MAX = +(Q.get('bank') || 8000);                          // 良品小格最多留這麼多（隨機抽），判一張約 1 秒
+const K_TOP = +(Q.get('k') || 10);                                // 一張照片的分數 = 最不像的 10 個小格平均
+$('#vDate').textContent = new Date().toLocaleDateString('zh-TW');
+
+let model = null, bank = null, calib = null;
+const items = [];                                // {name, file, url, score, p, dist(Float32Array G*G), el, truth, gem}
+let truthMap = null;
+
+// ── 0 進場就下載模型 ──────────────────────────────────────
+const files = {};
+const onProgress = e => {
+    if (e.status === 'progress' && e.total) {
+      files[e.file] = [e.loaded, e.total];
+      const [l, t] = Object.values(files).reduce((a, [x, y]) => [a[0] + x, a[1] + y], [0, 0]);
+      $('#mbar').style.width = (l / t * 100) + '%';
+      $('#mstat').textContent = `下載中 ${(l / 1e6).toFixed(1)} / ${(t / 1e6).toFixed(1)} MB（${env.remoteHost.includes('huggingface') ? 'Hugging Face' : '老師的鏡像'}）`;
+    }
+};
+async function loadModel() {
+  const opt = { dtype: 'q8', progress_callback: onProgress };
+  if (MODEL_MIRROR && !Q.has('hf')) {
+    env.remoteHost = MODEL_MIRROR;
+    try { return await AutoModel.from_pretrained(MODEL_ID, opt); }
+    catch (e) { console.warn('鏡像失敗，改用 Hugging Face：', e.message); for (const k in files) delete files[k]; }
+  }
+  env.remoteHost = 'https://huggingface.co/';
+  return AutoModel.from_pretrained(MODEL_ID, opt);
+}
+const tModel = performance.now();
+const modelReady = loadModel().then(m => { model = m; window.__stat = { ...(window.__stat || {}), modelSec: +((performance.now() - tModel) / 1000).toFixed(1), host: env.remoteHost }; $('#mbar').style.width = '100%'; $('#mstat').textContent = '模型準備好了 ✓'; return m; })
+  .catch(e => { $('#mstat').textContent = '模型下載失敗：' + e.message; throw e; });
+
+// ── 影像 → 特徵 ─────────────────────────────────────────
+async function toTensor(file) {
+  const bmp = await createImageBitmap(file);
+  const c = new OffscreenCanvas(S, S), x = c.getContext('2d');
+  x.drawImage(bmp, 0, 0, S, S);                  // 整張縮成正方形（不裁切，邊緣的瑕疵也看得到）
+  const d = x.getImageData(0, 0, S, S).data, n = S * S, a = new Float32Array(3 * n);
+  for (let i = 0; i < n; i++) for (let ch = 0; ch < 3; ch++) a[ch * n + i] = (d[i * 4 + ch] / 255 - MEAN[ch]) / STD[ch];
+  return { t: new Tensor('float32', a, [1, 3, S, S]), bmp };
+}
+async function patches(file) {
+  const m = await modelReady;
+  const { t, bmp } = await toTensor(file);
+  const out = await m({ pixel_values: t });
+  const h = out.last_hidden_state, D = h.dims[2], N = G * G;
+  const src = h.data, v = new Float32Array(N * D);
+  for (let i = 0; i < N; i++) {                  // 跳過第 0 個（CLS），每格 L2 正規化
+    let s = 0; const o = (i + 1) * D;
+    for (let k = 0; k < D; k++) s += src[o + k] ** 2;
+    s = 1 / Math.sqrt(s || 1);
+    for (let k = 0; k < D; k++) v[i * D + k] = src[o + k] * s;
+  }
+  return { v, D, N, bmp };
+}
+// 每個小格到良品庫最近的距離（1 − 最大 cos 相似度）
+function nnDist(v, N, D) {
+  const out = new Float32Array(N), B = bank.n;
+  for (let i = 0; i < N; i++) {
+    let best = -1; const oi = i * D;
+    for (let j = 0; j < B; j++) {
+      let s = 0; const oj = j * D, b = bank.v;
+      for (let k = 0; k < D; k++) s += v[oi + k] * b[oj + k];
+      if (s > best) best = s;
+    }
+    out[i] = 1 - best;
+  }
+  return out;
+}
+const eta = (t0, done, total) => done ? `預計還要 ${Math.ceil((performance.now() - t0) / done * (total - done) / 1000)} 秒` : '';
+const topMean = (d, k) => Array.from(d).sort((a, b) => b - a).slice(0, k).reduce((a, b) => a + b, 0) / k;
+const prob = s => 1 / (1 + Math.exp(-(s - calib.mu - 2 * calib.sd) / calib.sd));   // 良品平均 → 約 0.12；平均 + 2σ → 0.5；+4σ → 0.88（2026-09-22 用 5 組盲測＋換光源 400 張校過）
+
+// ── 1 良品 ───────────────────────────────────────────────
+let useGood = async function (list) {
+  list = list.filter(f => f.type.startsWith('image/')).sort((a, b) => a.name.localeCompare(b.name));
+  if (list.length < 8) { $('#gstat').textContent = '良品至少要 8 張'; return; }
+  list = list.slice(0, +$('#nGood').value);
+  const every = Math.max(3, Math.round(list.length / Math.max(4, Math.round(list.length / 5))));
+  const hold = list.filter((_, i) => i % every === every - 1);   // 約 1/5 留下來當「校正組」：算良品彼此差多少
+  const train = list.filter((_, i) => i % every !== every - 1);
+  $('#vImg').textContent = `良品 ${list.length} 張（${new Date().toLocaleDateString('zh-TW')}）`;
+  const t0 = performance.now(), feats = [];
+  for (let i = 0; i < train.length; i++) {
+    $('#gstat').textContent = `記住良品 ${i + 1} / ${train.length}　${eta(t0, i, train.length + hold.length)}`;
+    $('#gbar').style.width = ((i + 1) / (train.length + hold.length) * 100) + '%';
+    feats.push(await patches(train[i]));
+  }
+  const D = feats[0].D, all = feats.reduce((a, f) => a + f.N, 0);
+  const keep = Math.min(all, BANK_MAX), idx = new Uint32Array(all);
+  for (let i = 0; i < all; i++) idx[i] = i;
+  for (let i = all - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  const v = new Float32Array(keep * D);
+  for (let q = 0; q < keep; q++) { const g = idx[q], f = feats[Math.floor(g / feats[0].N)], r = g % feats[0].N; v.set(f.v.subarray(r * D, (r + 1) * D), q * D); }
+  bank = { v, n: keep, D };
+  const cs = [];
+  for (let i = 0; i < hold.length; i++) {
+    $('#gstat').textContent = `校正 ${i + 1} / ${hold.length}　${eta(t0, train.length + i, train.length + hold.length)}`;
+    $('#gbar').style.width = ((train.length + i + 1) / (train.length + hold.length) * 100) + '%';
+    const f = await patches(hold[i]); cs.push(topMean(nnDist(f.v, f.N, D), K_TOP));
+  }
+  const mu = cs.reduce((a, b) => a + b, 0) / cs.length;
+  const sd = Math.max(0.004, Math.sqrt(cs.reduce((a, b) => a + (b - mu) ** 2, 0) / cs.length));
+  calib = { mu, sd, patchHi: mu + 3 * sd };
+  const sec = ((performance.now() - t0) / 1000).toFixed(1);
+  $('#gstat').textContent = `學好了 ✓　良品 ${list.length} 張（${train.length} 張當範本、${hold.length} 張校正），花了 ${sec} 秒`;
+  window.__stat = { ...(window.__stat || {}), trainSec: +sec, nGood: list.length };
+  $('#tstat').textContent = '可以丟待判照片了';
+  if (items.length) rescoreAll();
+}
+
+// ── 2 待判 ───────────────────────────────────────────────
+let useTest = async function (list) {
+  list = list.filter(f => f.type.startsWith('image/')).sort((a, b) => a.name.localeCompare(b.name));
+  if (!bank) { $('#tstat').textContent = '請先做第 1 步（良品）'; return; }
+  items.length = 0; $('#grid').innerHTML = '';
+  const t0 = performance.now();
+  for (const f of list) items.push({ name: f.name, file: f });
+  items.forEach(drawCard);
+  for (let i = 0; i < items.length; i++) {
+    $('#tstat').textContent = `判 ${i + 1} / ${items.length}　${eta(t0, i, items.length)}`;
+    $('#tbar').style.width = ((i + 1) / items.length * 100) + '%';
+    await score(items[i]);
+  }
+  const sec = ((performance.now() - t0) / 1000).toFixed(1);
+  $('#tstat').textContent = `判完 ${items.length} 張 ✓　花了 ${sec} 秒`;
+  window.__stat = { ...(window.__stat || {}), testSec: +sec, n: items.length };
+  $('#gRun').disabled = !$('#gKey').value;
+}
+async function score(it) {
+  const f = await patches(it.file);
+  it.bmp = f.bmp; it.dist = nnDist(f.v, f.N, bank.D);
+  it.score = topMean(it.dist, K_TOP); it.p = prob(it.score);
+  paint(it); classify();
+}
+async function rescoreAll() { for (const it of items) await score(it); }
+
+function drawCard(it) {
+  const el = document.createElement('div'); el.className = 'item';
+  el.innerHTML = `<div class="img"><canvas></canvas></div><div class="meta">
+    <div class="row" style="justify-content:space-between"><span class="mute">${it.name}</span><span class="tag"></span></div>
+    <div class="p">…</div><div class="sev"></div><div class="truth"></div><div class="gem"></div></div>`;
+  it.el = el; $('#grid').appendChild(el);
+}
+function paint(it) {
+  const cv = it.el.querySelector('canvas'), W = it.bmp.width, H = it.bmp.height;
+  cv.width = W; cv.height = H; const x = cv.getContext('2d');
+  x.drawImage(it.bmp, 0, 0);
+  if ($('#showHeat').checked && it.dist) {
+    const hm = new OffscreenCanvas(G, G), hx = hm.getContext('2d'), img = hx.createImageData(G, G);
+    const lo = calib.patchHi, hi = Math.max(lo + 1e-3, Math.max(...it.dist));
+    for (let i = 0; i < G * G; i++) {
+      const a = Math.max(0, Math.min(1, (it.dist[i] - lo) / (hi - lo)));
+      img.data[i * 4] = 230; img.data[i * 4 + 1] = 20; img.data[i * 4 + 2] = 30; img.data[i * 4 + 3] = a > 0.12 ? Math.round(80 + a * 160) : 0;
+    }
+    hx.putImageData(img, 0, 0);
+    x.imageSmoothingEnabled = true; x.drawImage(hm, 0, 0, W, H);
+  }
+  it.el.querySelector('.p').textContent = it.p == null ? '…' : `不良機率 ${it.p.toFixed(2)}`;
+  const sevEl = it.el.querySelector('.sev');
+  if (it.dist && calib) {
+    let hot = 0; for (let i = 0; i < it.dist.length; i++) if (it.dist[i] > calib.patchHi) hot++;
+    const ratio = hot / it.dist.length;
+    const maxZ = (Math.max(...it.dist) - calib.mu) / calib.sd;
+    sevEl.textContent = `熱區佔比 ${(ratio * 100).toFixed(0)}%　最強差異 ${maxZ.toFixed(1)}σ`;
+  } else if (sevEl) sevEl.textContent = '';
+}
+
+// ── 3 三段式 ─────────────────────────────────────────────
+function classify() {
+  let lo = +$('#lo').value, hi = +$('#hi').value;
+  if (lo > hi) { [lo, hi] = [hi, lo]; }
+  $('#loV').textContent = lo.toFixed(2); $('#hiV').textContent = hi.toFixed(2);
+  let n = [0, 0, 0], miss = 0, fa = 0;
+  for (const it of items) {
+    if (it.p == null) continue;
+    const k = it.p < lo ? 'pass' : it.p < hi ? 'review' : 'stop';
+    it.k = k; n[['pass', 'review', 'stop'].indexOf(k)]++;
+    it.el.className = 'item ' + k;
+    const tg = it.el.querySelector('.tag'); tg.className = 'tag ' + k; tg.textContent = { pass: '放行', review: '轉人工', stop: '攔下' }[k];
+    const tr = it.el.querySelector('.truth');
+    if (truthMap && truthMap[it.name] != null) {
+      const bad = truthMap[it.name] !== '良品';
+      const m = bad && k === 'pass', f = !bad && k === 'stop';
+      miss += m; fa += f;
+      tr.className = 'truth ' + (m ? 'miss' : f ? 'fa' : '');
+      tr.textContent = `答案：${truthMap[it.name]}` + (m ? '　← 漏檢' : f ? '　← 誤判' : '');
+    }
+  }
+  $('#nPass').textContent = n[0]; $('#nRev').textContent = n[1]; $('#nStop').textContent = n[2];
+  const tot = n[0] + n[1] + n[2];
+  $('#rRev').textContent = tot ? `${n[1]} / ${tot} = ${Math.round(n[1] / tot * 100)}%` : '—';
+  if (truthMap) { $('#truthKpi').style.display = ''; $('#nMiss').textContent = miss; $('#nFA').textContent = fa; }
+  window.__stat = { ...(window.__stat || {}), pass: n[0], review: n[1], stop: n[2], miss, fa,
+    scores: items.map(i => ({ name: i.name, p: i.p, s: i.score, z: (i.score - calib.mu) / calib.sd, k: i.k, gem: i.gem })), calib };
+}
+$('#lo').oninput = $('#hi').oninput = classify;
+$('#showHeat').onchange = () => items.forEach(it => it.bmp && paint(it));
+
+$('#fAns').onchange = async e => {
+  const j = JSON.parse(await e.target.files[0].text());
+  truthMap = j['待判照片'] && !items.some(it => it.name.startsWith('盲測')) ? j['待判照片'] : (j['盲測'] || j);
+  if (items.some(it => it.name.startsWith('待判')) && j['待判照片']) truthMap = j['待判照片'];
+  classify();
+};
+
+// ── 拖放與選檔 ───────────────────────────────────────────
+async function readEntries(dt) {
+  const out = [];
+  async function walk(en) {
+    if (en.isFile) out.push(await new Promise(r => en.file(r)));
+    else if (en.isDirectory) { const rd = en.createReader(); let batch; do { batch = await new Promise(r => rd.readEntries(r)); for (const x of batch) await walk(x); } while (batch.length); }
+  }
+  for (const it of dt.items) { const en = it.webkitGetAsEntry?.(); if (en) await walk(en); }
+  return out.length ? out : [...dt.files];
+}
+function hookDrop(el, fn) {
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('on'); });
+  el.addEventListener('dragleave', () => el.classList.remove('on'));
+  el.addEventListener('drop', async e => { e.preventDefault(); el.classList.remove('on'); fn(await readEntries(e.dataTransfer)); });
+}
+const safe = (fn, stat) => async list => { try { await fn(list); } catch (e) { console.error(e); $(stat).textContent = '出錯了：' + (e.message || e).slice(0, 120) + '（重新整理再試一次）'; } };
+useGood = safe(useGood, '#gstat'); useTest = safe(useTest, '#tstat');
+hookDrop($('#dropGood'), useGood); hookDrop($('#dropTest'), useTest);
+$('#fGood').onchange = e => useGood([...e.target.files]);
+$('#fGood2').onchange = e => useGood([...e.target.files]);
+$('#fTest').onchange = e => useTest([...e.target.files]);
+$('#fTestDir').onchange = e => useTest([...e.target.files]);
+
+// ── 方法二：Gemini ───────────────────────────────────────
+$('#gKey').oninput = () => { $('#gRun').disabled = !$('#gKey').value || !items.length; };
+const b64 = f => new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(',')[1]); fr.readAsDataURL(f); });
+$('#gRun').onclick = async () => {
+  const key = $('#gKey').value.trim(), m = $('#gModel').value;
+  $('#gRun').disabled = true;
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i]; $('#gStat').textContent = `Gemini 判 ${i + 1} / ${items.length}…`;
+    const body = { contents: [{ parts: [
+      { text: '你是產線外觀檢驗員。這張照片裡的產品有沒有外觀瑕疵（刮痕、缺件、變形、異物、變色、破損等）？只回 JSON：{"defect_prob": 0 到 1 的數字, "reason": "一句繁體中文理由"}' },
+      { inline_data: { mime_type: it.file.type || 'image/jpeg', data: await b64(it.file) } } ] }],
+      generationConfig: { responseMimeType: 'application/json' } };
+    const g = it.el.querySelector('.gem');
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error?.message || r.status);
+      const o = JSON.parse(j.candidates[0].content.parts.map(p => p.text || '').join(''));
+      it.gem = { p: +o.defect_prob, reason: o.reason };
+      g.innerHTML = `<b>Gemini</b> 不良機率 ${(+o.defect_prob).toFixed(2)}：${o.reason}`;
+    } catch (e) { it.gem = { err: String(e.message || e) }; g.textContent = 'Gemini 失敗：' + (e.message || e); }
+  }
+  $('#gStat').textContent = 'Gemini 判完了。把兩種方法的結果並排看：哪一個抓到的比較多？'; classify();
+  $('#gRun').disabled = false;
+};
+</script>
+</body>
+</html>
